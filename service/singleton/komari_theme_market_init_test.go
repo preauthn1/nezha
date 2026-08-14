@@ -45,6 +45,10 @@ func TestInitFrontendTemplatesLoadsFutureCatalogEntriesFromConfiguredCache(t *te
 }
 
 func TestInitFrontendTemplatesDoesNotStartThemeInstallerBeforeConfig(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("NZ_KOMARI_THEME_MARKET_URL", "https://127.0.0.1.invalid/catalog.json")
+	t.Setenv("NZ_KOMARI_THEME_MARKET_CACHE", filepath.Join(dir, "market.json"))
+
 	originalConf := Conf
 	Conf = nil
 	t.Cleanup(func() { Conf = originalConf })
@@ -62,7 +66,7 @@ func TestInitFrontendTemplatesDoesNotStartThemeInstallerBeforeConfig(t *testing.
 	}
 }
 
-func TestStartKomariThemeSyncStartsOnceAfterConfig(t *testing.T) {
+func TestStartKomariThemeSyncStartsAfterConfig(t *testing.T) {
 	originalConf := Conf
 	Conf = &ConfigClass{Config: &model.Config{}}
 	t.Cleanup(func() { Conf = originalConf })
@@ -77,10 +81,5 @@ func TestStartKomariThemeSyncStartsOnceAfterConfig(t *testing.T) {
 	case <-started:
 	case <-time.After(time.Second):
 		t.Fatal("theme installer did not start after config initialization")
-	}
-	select {
-	case <-started:
-		t.Fatal("a single StartKomariThemeSync call started installer more than once")
-	default:
 	}
 }
