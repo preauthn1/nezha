@@ -4,8 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/nezhahq/nezha/model"
 )
 
 func TestInitFrontendTemplatesLoadsFutureCatalogEntriesFromConfiguredCache(t *testing.T) {
@@ -55,6 +58,29 @@ func TestInitFrontendTemplatesDoesNotStartThemeInstallerBeforeConfig(t *testing.
 	select {
 	case <-started:
 		t.Fatal("theme installer started before dashboard config was initialized")
+	default:
+	}
+}
+
+func TestStartKomariThemeSyncStartsOnceAfterConfig(t *testing.T) {
+	originalConf := Conf
+	Conf = &ConfigClass{Config: &model.Config{}}
+	t.Cleanup(func() { Conf = originalConf })
+
+	started := make(chan struct{}, 1)
+	originalSync := syncKomariThemesAsync
+	syncKomariThemesAsync = func() { started <- struct{}{} }
+	t.Cleanup(func() { syncKomariThemesAsync = originalSync })
+
+	StartKomariThemeSync()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("theme installer did not start after config initialization")
+	}
+	select {
+	case <-started:
+		t.Fatal("a single StartKomariThemeSync call started installer more than once")
 	default:
 	}
 }

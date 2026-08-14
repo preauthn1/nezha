@@ -15,9 +15,14 @@ import (
 const grpcMaxConnectionIdle = 15 * time.Minute
 
 func grpcServerOptions(maxConnectionIdle time.Duration) []grpc.ServerOption {
-	return []grpc.ServerOption{
+	return append([]grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(getRealIp, waf),
 		grpc.ChainStreamInterceptor(getRealIpStream, wafStream),
+	}, grpcServerTransportOptions(maxConnectionIdle)...)
+}
+
+func grpcServerTransportOptions(maxConnectionIdle time.Duration) []grpc.ServerOption {
+	return []grpc.ServerOption{
 		// Agents maintain long-lived active streams, while unauthenticated or
 		// abandoned HTTP/2 transports otherwise retain an FD and transport
 		// buffers forever. Reap only transports with no active RPCs; connected
