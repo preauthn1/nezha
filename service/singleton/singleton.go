@@ -69,13 +69,26 @@ func LoadSingleton(bus chan<- *model.Service) (err error) {
 }
 
 // InitFrontendTemplates 从内置文件中加载FrontendTemplates
+// syncKomariThemesAsync is a test seam for the post-config installer. The
+// installer must never be launched by InitFrontendTemplates because that step
+// runs before InitConfigFromPath in the real dashboard startup sequence.
+var syncKomariThemesAsync = syncKomariThemes
+
+// StartKomariThemeSync starts the optional selected-theme installer only after
+// configuration has been initialized.
+func StartKomariThemeSync() {
+	if Conf == nil || Conf.Config == nil {
+		return
+	}
+	go syncKomariThemesAsync()
+}
+
 func InitFrontendTemplates() error {
 	var builtins []model.FrontendTemplate
 	if err := yaml.Unmarshal(frontendTemplatesYAML, &builtins); err != nil {
 		return err
 	}
 	FrontendTemplates = appendKomariThemeMarketTemplates(builtins)
-	go syncKomariThemes()
 	return nil
 }
 

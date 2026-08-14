@@ -124,6 +124,7 @@ func main() {
 	serviceSentinelDispatchBus := make(chan *model.Service)
 	if err := utils.FirstError(singleton.InitFrontendTemplates,
 		func() error { return singleton.InitConfigFromPath(dashboardCliParam.ConfigFile) },
+		func() error { singleton.StartKomariThemeSync(); return nil },
 		initIDCodec,
 		singleton.InitTimezoneAndCache,
 		func() error {

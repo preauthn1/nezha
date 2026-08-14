@@ -9,6 +9,10 @@ import (
 )
 
 func TestInitFrontendTemplatesLoadsFutureCatalogEntriesFromConfiguredCache(t *testing.T) {
+	originalConf := Conf
+	Conf = nil
+	t.Cleanup(func() { Conf = originalConf })
+
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "market.json")
 	catalog := `{"schema":1,"themes":[{"name":"Future Theme","short":"future-theme","version":"9.1","author":"Future Author","url":"https://github.com/example/future","preview":"https://cdn.example/future.webp","download":"https://github.com/example/future/releases/download/v9.1/theme.zip","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}`
@@ -35,4 +39,22 @@ func TestInitFrontendTemplatesLoadsFutureCatalogEntriesFromConfiguredCache(t *te
 	}
 	require.True(t, found)
 	require.Equal(t, "https://cdn.example/future.webp", KomariThemeWallpapers["komari-market-future-theme"])
+}
+
+func TestInitFrontendTemplatesDoesNotStartThemeInstallerBeforeConfig(t *testing.T) {
+	originalConf := Conf
+	Conf = nil
+	t.Cleanup(func() { Conf = originalConf })
+
+	started := make(chan struct{}, 1)
+	originalSync := syncKomariThemesAsync
+	syncKomariThemesAsync = func() { started <- struct{}{} }
+	t.Cleanup(func() { syncKomariThemesAsync = originalSync })
+
+	require.NoError(t, InitFrontendTemplates())
+	select {
+	case <-started:
+		t.Fatal("theme installer started before dashboard config was initialized")
+	default:
+	}
 }

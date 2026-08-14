@@ -42,8 +42,12 @@ func TestKomariAPIShimInterceptsPublicReadOnlyContracts(t *testing.T) {
 	require.Contains(t, shim, "window.WebSocket")
 	require.Contains(t, shim, "mergeNezhaSnapshot")
 	require.Contains(t, shim, "maxMetricRequests")
-	require.Contains(t, shim, "u.origin === location.origin && u.pathname === '/api/rpc2'")
-	require.Contains(t, shim, "u.origin === location.origin && u.pathname === '/api/clients'")
+	// WebSocket origins use ws:/wss:, so comparing URL.origin to the page's
+	// http:/https: origin bypasses the shim. Match host + allowlisted path.
+	require.Contains(t, shim, "u.host === location.host && u.pathname === '/api/rpc2'")
+	require.Contains(t, shim, "u.host === location.host && u.pathname === '/api/clients'")
+	require.Contains(t, shim, "input instanceof URL")
+	require.NotContains(t, shim, "u.origin === location.origin && u.pathname === '/api/rpc2'")
 	require.Contains(t, shim, "/api/admin/theme/settings")
 	require.Contains(t, shim, "redirectKomariAdmin")
 	require.Contains(t, shim, "history.pushState")
@@ -105,4 +109,20 @@ func TestKomariShimNodeFixtureConversion(t *testing.T) {
 	require.Equal(t, int64(512), got.Status.RAM)
 	require.Equal(t, int64(44), got.Status.NetTotalUp)
 	require.True(t, got.Status.Online)
+}
+
+func TestKomariShimConvertsNezhaDisplayIndexToAscendingKomariWeight(t *testing.T) {
+	// Nezha puts larger display_index values first, while Komari themes sort
+	// smaller weight values first. The adapter must invert the sign so the
+	// administrator's Nezha ordering survives in every weight-aware theme.
+	high, err := KomariShimConvertServerFixture([]byte(`{"id":1,"name":"high","display_index":20}`))
+	require.NoError(t, err)
+	low, err := KomariShimConvertServerFixture([]byte(`{"id":2,"name":"low","display_index":5}`))
+	require.NoError(t, err)
+	require.Less(t, high.Weight, low.Weight)
+	require.Equal(t, -20, high.Weight)
+	require.Equal(t, -5, low.Weight)
+
+	shim := string(KomariAPIShimJS())
+	require.Contains(t, shim, "weight: -num(s?.display_index)")
 }

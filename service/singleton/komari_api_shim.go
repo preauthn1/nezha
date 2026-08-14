@@ -34,10 +34,11 @@ func InjectKomariCompatibility(document []byte, templatePath, wallpaper string) 
 }
 
 type komariShimServerFixture struct {
-	ID         uint64    `json:"id"`
-	Name       string    `json:"name"`
-	LastActive time.Time `json:"last_active"`
-	Host       struct {
+	ID           uint64    `json:"id"`
+	Name         string    `json:"name"`
+	DisplayIndex int       `json:"display_index"`
+	LastActive   time.Time `json:"last_active"`
+	Host         struct {
 		Platform       string   `json:"platform"`
 		CPU            []string `json:"cpu"`
 		MemTotal       int64    `json:"mem_total"`
@@ -56,6 +57,7 @@ type komariShimServerFixture struct {
 type KomariShimFixtureResult struct {
 	UUID     string
 	Name     string
+	Weight   int
 	OS       string
 	MemTotal int64
 	Status   struct {
@@ -74,6 +76,10 @@ func KomariShimConvertServerFixture(raw []byte) (KomariShimFixtureResult, error)
 	var out KomariShimFixtureResult
 	out.UUID = fmt.Sprint(src.ID)
 	out.Name = src.Name
+	// Nezha sorts larger display_index values first. Komari's public themes
+	// consistently treat smaller weight values as higher priority, so preserve
+	// the configured order by inverting the sign at the API boundary.
+	out.Weight = -src.DisplayIndex
 	out.OS = src.Host.Platform
 	out.MemTotal = src.Host.MemTotal
 	out.Status.CPU = src.State.CPU

@@ -20,7 +20,12 @@
     'uptime': 'uptime', 'temperature': 'temperature', 'gpu.usage': 'gpu'
   };
 
-  const asURL = input => new URL(typeof input === 'string' ? input : input.url, location.href);
+  const asURL = input => {
+    if (input instanceof URL) return input;
+    if (typeof input === 'string') return new URL(input, location.href);
+    if (input instanceof Request) return new URL(input.url, location.href);
+    return new URL(input?.url || String(input), location.href);
+  };
   const response = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: jsonHeaders });
   const rpcOK = (id, result) => ({ jsonrpc: '2.0', id: id == null ? null : id, result });
   const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id == null ? null : id, error: { code, message } });
@@ -99,7 +104,8 @@
       cpu_physical_cores: (h.cpu || []).length, os: h.platform || '', kernel_version: h.platform_version || '',
       gpu_name: (h.gpu || []).join(' / '), region: s?.country_code || '', mem_total: num(h.mem_total),
       swap_total: num(h.swap_total), disk_total: num(h.disk_total), version: h.version || '',
-      weight: num(s?.display_index), price: 0, billing_cycle: 0, auto_renewal: false, currency: '',
+      // Nezha: larger display_index first. Komari: smaller weight first.
+      weight: -num(s?.display_index), price: 0, billing_cycle: 0, auto_renewal: false, currency: '',
       expired_at: null, group: 'Nezha', tags: s?.country_code || '', public_remark: s?.public_note || '',
       hidden: false, traffic_limit: 0, traffic_limit_type: 'sum', created_at: '', updated_at: iso(s?.last_active)
     };
@@ -355,8 +361,8 @@
   window.XMLHttpRequest = KomariXMLHttpRequest;
   window.WebSocket = function(url, protocols) {
     const u = asURL(url);
-    if (u.origin === location.origin && u.pathname === '/api/rpc2') return new KomariRPCWebSocket(url, protocols);
-    if (u.origin === location.origin && u.pathname === '/api/clients') return new KomariClientsWebSocket(url, protocols);
+    if (u.host === location.host && u.pathname === '/api/rpc2') return new KomariRPCWebSocket(url, protocols);
+    if (u.host === location.host && u.pathname === '/api/clients') return new KomariClientsWebSocket(url, protocols);
     return new NativeWebSocket(url, protocols);
   };
   Object.assign(window.WebSocket, { CONNECTING:0, OPEN:1, CLOSING:2, CLOSED:3 });
