@@ -2,34 +2,13 @@ package rpc
 
 import (
 	"net"
-	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 
 	"github.com/nezhahq/nezha/proto"
 	rpcService "github.com/nezhahq/nezha/service/rpc"
 	"github.com/nezhahq/nezha/service/singleton"
 )
-
-const grpcMaxConnectionIdle = 15 * time.Minute
-
-func grpcServerOptions(maxConnectionIdle time.Duration) []grpc.ServerOption {
-	return append([]grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(getRealIp, waf),
-		grpc.ChainStreamInterceptor(getRealIpStream, wafStream),
-	}, grpcServerTransportOptions(maxConnectionIdle)...)
-}
-
-func grpcServerTransportOptions(maxConnectionIdle time.Duration) []grpc.ServerOption {
-	return []grpc.ServerOption{
-		// Agents maintain long-lived active streams, while unauthenticated or
-		// abandoned HTTP/2 transports otherwise retain an FD and transport
-		// buffers forever. Reap only transports with no active RPCs; connected
-		// agents and their streams are unaffected.
-		grpc.KeepaliveParams(keepalive.ServerParameters{MaxConnectionIdle: maxConnectionIdle}),
-	}
-}
 
 func SetReceiptGateListener(listener net.Listener) {
 	rpcService.SetReceiptGateListener(listener)
@@ -51,7 +30,10 @@ func ServeRPC() *grpc.Server {
 	// gate as unary calls; without the stream interceptors authHandler.check
 	// sees an empty real IP, so brute-force BlockIP counters never key on a
 	// source and the WAF block table is bypassed at the stream entrypoint.
-	server := grpc.NewServer(grpcServerOptions(grpcMaxConnectionIdle)...)
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(getRealIp, waf),
+		grpc.ChainStreamInterceptor(getRealIpStream, wafStream),
+	)
 	rpcService.NezhaHandlerSingleton = rpcService.NewNezhaHandler()
 	// Install the IOStream revocation hook so ServerTransferShared can tear
 	// down terminal/FM/NAT sessions held by the previous owner on every
